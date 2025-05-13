@@ -58,7 +58,7 @@ kdiv = 0.8
 offset = 0.1
 
 # — Load initial cell positions —
-matfile = sio.loadmat('/Users/ansa/Desktop/copos-lab/Regen_ABS/python/cellinitialization_n500.mat')
+matfile = sio.loadmat('cellinitialization_n500.mat')
 N = int(matfile['Ncells'][0,0])
 pos0 = matfile['pos0']    # shape: (N,2)
 print(f"Successfully loaded {N} cells from MATLAB file")
