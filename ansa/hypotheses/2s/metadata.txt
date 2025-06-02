@@ -1,0 +1,54 @@
+Time Elapsed: 00:09:56
+
+Simulation Parameters
+====================
+
+Time Parameters
+--------------
+Total time (TMAX): 5.0
+Time step (DT): 1e-05
+Total steps: 500000
+Timesteps saved: 500
+
+Physical Parameters
+------------------
+Critical distance (DL_CRIT): 0.1
+Damping coefficient (XI): 1.5
+Boundary stiffness (KB): 10.0
+Bending stiffness (KBEND): 0.002
+Collision strength (KCOLL): 0.75
+Proximal force (KPROX): 1000
+Proximal position (XPROX): 0.0
+Soft boundary range: (-0.5, 0.5)
+
+Spring Constant Between Boundary and Closest Cell (K_BCC): 40.0 Cell Division Parameters
+----------------------
+Death rate (KDEATH): 0.123
+Division rate (KDIV): 0.4
+Daughter offset (OFFSET): 0.1
+
+Domain Bounds
+-------------
+X range: [0, 5]
+Y range: [-3.0, 3.0]
+
+Cell Statistics
+--------------
+Initial cells: 500
+Final total cells: 2079
+Total division events: 2259
+Growth region cells: 443
+
+Simulation Settings
+------------------
+Video enabled: True
+Frame skip: 1000
+Profiling enabled: False 
+Growth Region Morphometrics
+-----------------------
+Semi-major axis (length): 0.84
+Area: 1.32
+Perimeter: 3.00
+Aspect ratio: 0.73
+Ellipticity: -0.37
+Roundness: 0.54
