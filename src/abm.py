@@ -25,7 +25,7 @@ from config import *
 import shutil
 from scipy.special import expit
 from scipy.sparse import spdiags
-from numpy import int64, float64
+from numpy import dtype, int64, float64
 from numba import njit, prange
 import os
 import time
@@ -183,9 +183,28 @@ def build_boundaries(soft=True):
 
     return Xe0, Xe, Ne, Db, blp0, blm0, dsb, kb_vals, Xb
 
+def stiffness_swap(kb_vals0, kb_vals_f, t_, swap_interval=SOFTENING_SWAP_INTERVAL): ###
+    t_scaled = t_/swap_interval
+    kb_vals = (1-t_scaled)*kb_vals0 + t_scaled*kb_vals_f
+
+    return kb_vals
+
+def update_L0(blp0, lp):
+    """Update rest length of epithelium springs (viscoelastic)"""
+    
+    blp0_new = blp0 + ((1/LAM_VISCO) * (lp-blp0))*DT
+    blm0_new = np.roll(blp0_new, 1)
+    return blp0_new, blm0_new
+
 # Initialize boundary
 Xe0, Xe, Ne, Db, blp0, blm0, dsb, kb_vals, Xb = build_boundaries(
     soft=ALLOW_SOFTENING)
+
+kb_vals0 = kb_vals # only significant with stiffness swapping
+_, _, _, _, _, _, _, kb_vals_f, _ = build_boundaries(
+    soft=not ALLOW_SOFTENING)
+# stiffness_swapped = False
+
 left_wall = np.min(Xe0[:, 0])
 x_cut = 0  # amputation plane
 DbT = Db.T.tocsr()
@@ -734,13 +753,15 @@ def cell_operations(t, pos_active, v_active, Xe, left_wall, reset=False,
 
 def single_iteration(step, t):
     """Steps the simulation forward one timestep"""
-    global pos, v, n_daughter, Xe, division_status, Ne, x_cut, T_DORMANT, regulation_front
+    global pos, v, n_daughter, Xe, division_status, Ne, x_cut, T_DORMANT, regulation_front, blp0, blm0
     Xe_before_update = Xe.copy()
     F_cc_full = np.zeros((CELLS_MAX, 2))
     F_on_cell_full = np.zeros((CELLS_MAX, 2))
 
     F_on_epi = np.zeros((Ne, 2))
-
+    lp = np.linalg.norm(Db.dot(Xe), axis=1)
+    if EPI_TYPE == "viscoelastic":
+        blp0, blm0 = update_L0(blp0, lp)
     if t >= T_DORMANT:
         cell_cycle(
             div_allowed=True,
@@ -752,7 +773,6 @@ def single_iteration(step, t):
     active = np.where(~np.isnan(pos[:, 0]))[0]
     pos_active = pos[active].copy()
     v_active = np.zeros((len(active), 2))
-
 
     if JAMMING_ENABLED:
         update_jammed_cells(Xe)
@@ -814,7 +834,7 @@ def single_iteration(step, t):
 
 def run_simulation():
     """Main simulation loop with data collection"""
-    global pos, Xe, Ne, Db, blp0, blm0, dsb, regulation_front, cell_types
+    global pos, Xe, kb_vals, Ne, Db, blp0, blm0, dsb, regulation_front, cell_types
 
     # Collect config parameters
     import config
@@ -837,6 +857,7 @@ def run_simulation():
             'KB_MAX': config.KAPPA0,
             'KB_MID': config.KAPPA1,
             'KB_MIN': config.KAPPA2,
+            'LAM_VISCO': config.LAM_VISCO
         },
         'Bone/Softening': {
             'BONE_VISUALIZATION': config.BONE_VISUALIZATION,
@@ -930,6 +951,7 @@ def run_simulation():
     times = []
     cell_count = []
     step_times = []
+    ### rest lengths time series
     morphometrics_data = {
         'area_growth_region': [],
         'perimeter': [],
@@ -983,6 +1005,10 @@ def run_simulation():
 
         if PRINT_STEPS_FLAG and step % PRINT_STEPS_INTERVAL == 0:
             print(f"t = {t:.2f}, Step {step}/{STEPS_TOTAL}, cells: {N_active}")
+        
+        if (SOFTENING_SWAP_TIME is not None) and abs(t - SOFTENING_SWAP_TIME) < SOFTENING_SWAP_INTERVAL/2:
+            t_ = t - (SOFTENING_SWAP_TIME - SOFTENING_SWAP_INTERVAL/2)
+            kb_vals = stiffness_swap(kb_vals0, kb_vals_f, t_, swap_interval=SOFTENING_SWAP_INTERVAL) ###
 
         # Print total external force at EXT_FORCE_DELAY
         if EXT_STRESS_FORCE and not ext_force_printed and t >= EXT_FORCE_DELAY:
@@ -1076,8 +1102,6 @@ def run_simulation():
         coefficients_growth = coefficients(Xe_growth, n=5, type='data', rotate=True)  # Chebyshev coefficients
     else:
         coefficients_growth = None
-
-            
 
     ctrl_curve = np.loadtxt(CTRL_AVG_FILE, skiprows=1, delimiter=',')
     c59_curve = np.loadtxt(C59_AVG_FILE, skiprows=1, delimiter=',')

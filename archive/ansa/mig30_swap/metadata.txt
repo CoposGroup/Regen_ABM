@@ -1,0 +1,55 @@
+============================================================
+SIMULATION RESULTS SUMMARY
+============================================================
+
+Time Elapsed (wall clock): 00:37:36
+
+============================================================
+CELL STATISTICS
+============================================================
+
+Initial cells: 500
+Final cells: 3294
+Net change: +2794
+
+Total division events: 2903
+Total deaths: 98
+Net from divisions/deaths: +2805
+
+Initial migrant cells: 150
+Final migrant cells: 1015
+Initial intercalation cells: 0
+Final intercalation cells: 0
+
+============================================================
+MORPHOMETRICS
+============================================================
+
+Semi-major axis (length): 112.34 um
+Semi-minor axis (width): 230.89 um
+Area: 36144.78 um^2
+Perimeter: 527.55 um
+Aspect ratio (Growth Region): 0.49
+Aspect ratio (Whole Limb): 0.85
+Ellipticity: -1.06
+Roundness: 0.61
+Volume fraction: 0.99986
+
+RMSE (CTRL): 75.77412 um
+
+RMSE (C59): 42.20445 um
+
+Hausdorff (CTRL): 110.37947 um
+
+Hausdorff (C59): 57.39514 um
+
+============================================================
+CHEBYSHEV COEFFICIENTS
+============================================================
+
+Number of coefficients: 5
+First 5 coefficients: [-0.02, 0.01, 0.24, 0.00, 0.01]
+
+============================================================
+Data saved to: mig30_swap
+============================================================

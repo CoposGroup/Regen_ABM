@@ -1,0 +1,78 @@
+"""
+Configuration parameters used for this simulation run.
+These are the actual runtime values that were used.
+"""
+
+import numpy as np
+# Time Parameters
+DT = 5e-06
+TMAX = 7.0
+STEPS_TOTAL = 1400001
+
+# Physical Parameters
+CONVERSION_FACTOR_UM = 200
+D0 = 0.1
+XI = 1.5
+K_BC_REP = 80.0
+K_BC_ADH = 0.01
+K_CC_REP = 30.0
+K_CC_ADH = 0.15
+SIGMA = 0.005
+K_LATERAL = 0.008
+KB_MAX = 150.0
+KB_MID = 75.0
+KB_MIN = 1.0
+
+# Bone/Softening
+BONE_VISUALIZATION = True
+ALLOW_SOFTENING = True
+SPORATIC_SOFTENING = False
+
+# Cell Cycle
+T_DORMANT = 1.0
+KDEATH = 0.01
+KDIV = 0.42857142857142855
+M_LENGTH = 1.1666666666666667
+G_LENGTH = 1.1666666666666667
+G_LENGTH_MAX = 1.5
+G_LENGTH_MIN = 0.75
+GRADIENT = False
+DIRECTED_DIVISION_ANGLE = None
+
+# Migration
+MIGRATION_ENABLED = True
+MIGRATION_FRACTION = 0.5
+MIGRATION_DELAY = 2.0
+WHICH_MIGRATION = 'random'
+MIGRATION_DIRECTION = 'x'
+MU_MIGRATION = 0.5
+SIGMA_MIGRATION = 0.005
+REGULATION_FRONT_FLAG = True
+
+# Intercalation
+INTERCALATION_ENABLED = False
+INTERCAL_FRACTION = 0.0
+INTERCAL_DELAY = 2.0
+MU_INTERCAL = 0.5
+SIGMA_INTERCAL = 0.005
+
+# Jamming
+JAMMING_ENABLED = False
+FLUID_LIKE_ZONE_WIDTH = 0.9
+K_CC_REP_JAMMED = 30.0
+K_CC_ADH_JAMMED = 0.15
+SIGMA_JAMMED = 0.0
+SIGMA_UNJAMMED = 0.05
+
+# External Stress
+EXT_STRESS_FORCE = False
+EXT_FORCE_DELAY = 3.0
+K_EXT = 1.0
+FORCE_PER_UNIT_LENGTH = 90.0
+POKING_POINTS = np.array([97, 98, 99, 100, 101, 102])
+
+# Output
+VIDEO_FLAG = True
+FRAME_SKIP = 2000
+OUTPUT_DIR = '/Users/ansa/Documents/CoposLab/Regen_ABM/simulationOutput'
+

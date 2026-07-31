@@ -21,7 +21,8 @@ SIM_BOUNDS = {
     'KDEATH': (0.0, 0.5),
     'KB_MID': (0.0, 100.0),
     'KB_MIN': (0.0, 100.0),
-    'MU_MIGRATION':(0.25, 0.75)
+    'MU_MIGRATION':(0.25, 0.75),
+    'LAM_VISCO': (0.01, 10.0)
 }
 
 # Check for bounds override file (used by warm_start_pso.py for multiprocessing compatibility)
@@ -387,6 +388,37 @@ Time: {elapsed/3600:.2f}h elapsed, {(elapsed/(i+1))*(n_iterations-i-1)/3600:.2f}
 
 def define_swarms(which=1):
     """Define swarm configurations based on biological regions."""
+    if which == 0:
+        param_names = ['MIGRATION_FRACTION', 'KDIV', 'LAM_VISCO']
+        swarms = {
+            'CTRL': [
+                {
+                    'name': 'visco_ctrl',
+                    'center': {'MIGRATION_FRACTION': 0.5, 'KDIV': 0.35, 'LAM_VISCO': 5.0},
+                    'options': {
+                        "c1": 1.6,
+                        "c2": 0.8,
+                        "w": 0.6,
+                        "k": 2,
+                        "p": 2},
+                    'topology': 'lbest',
+                },
+            ],
+            'C59': [
+                {
+                    'name': 'visco_c59',
+                    'center': {'MIGRATION_FRACTION': 0.5, 'KDIV': 0.35, 'LAM_VISCO': 5.0},
+                    'options': {
+                        "c1": 1.6,
+                        "c2": 0.8,
+                        "w": 0.7,
+                        "k": 2,
+                        "p": 2},
+                    'topology': 'lbest',
+                },
+            ],
+        }
+        
     if which == 1:
         param_names = ['MIGRATION_FRACTION', 'KDIV', 'KB_MID', 'KB_MIN']
         
@@ -471,7 +503,6 @@ def define_swarms(which=1):
 
     return swarms, param_names
 
-
 if __name__ == '__main__':
     
     exp_data_files = {
@@ -486,7 +517,7 @@ if __name__ == '__main__':
     
     all_results = {}
     
-    for condition in ['C59']:#['CTRL', 'C59']:
+    for condition in ['CTRL']:#['CTRL', 'C59']:
         print(f"\n{'#'*70}")
         print(f"# {condition} swarms")
         print(f"{'#'*70}")

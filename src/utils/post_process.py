@@ -435,11 +435,10 @@ def growth_plot(Xe0, Xe_final, title, Xb=None, conversion_factor_um=CONVERSION_F
     if Xb_display is not None:
         ax.plot(Xb_display[:,0], Xb_display[:,1], 'k-', lw=2, alpha=0.5, label='Bone boundary')
 
-    fig.tight_layout()    
-    fig.savefig(f'{OUTPUT_DIR}/{re.sub(r'\s+', '', title)}_growth.pdf', dpi=400, bbox_inches='tight', pad_inches=0)
+    fig.tight_layout()
+    title = re.sub(r'\s+', '', title)
+    fig.savefig(f"{OUTPUT_DIR}/{title}_growth.pdf", dpi=400, bbox_inches='tight', pad_inches=0)
     plt.close(fig)
-
-
 
 def runtime_plot(cell_count, steptimes, OUTPUT_DIR=None):
     """Create a plot of runtime vs time"""
@@ -864,7 +863,7 @@ Used to calculate errors for parameter inference.
 def parameterize_curve(curve):
     """take curve of (x,y) points, return (theta, r) ordered by theta [-pi/2, pi/2]"""
     x, y = curve[:,0], curve[:,1]
-    theta = np.atan(y/x)
+    theta = np.arctan(y/x)
     r = np.sqrt(x**2 + y**2)
     pCurve = np.column_stack((theta, r))
     sort_indices = pCurve[:, 0].argsort()

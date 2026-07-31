@@ -1,0 +1,55 @@
+============================================================
+SIMULATION RESULTS SUMMARY
+============================================================
+
+Time Elapsed (wall clock): 00:31:12
+
+============================================================
+CELL STATISTICS
+============================================================
+
+Initial cells: 500
+Final cells: 3393
+Net change: +2893
+
+Total division events: 3000
+Total deaths: 96
+Net from divisions/deaths: +2904
+
+Initial migrant cells: 0
+Final migrant cells: 0
+Initial intercalation cells: 0
+Final intercalation cells: 0
+
+============================================================
+MORPHOMETRICS
+============================================================
+
+Semi-major axis (length): 116.67 um
+Semi-minor axis (width): 249.02 um
+Area: 46855.43 um^2
+Perimeter: 599.71 um
+Aspect ratio (Growth Region): 0.47
+Aspect ratio (Whole Limb): 0.85
+Ellipticity: -1.13
+Roundness: 0.61
+Volume fraction: 0.99863
+
+RMSE (CTRL): 66.58581 um
+
+RMSE (C59): 64.35698 um
+
+Hausdorff (CTRL): 110.57161 um
+
+Hausdorff (C59): 75.79220 um
+
+============================================================
+CHEBYSHEV COEFFICIENTS
+============================================================
+
+Number of coefficients: 5
+First 5 coefficients: [-0.06, 0.00, 0.22, -0.01, 0.08]
+
+============================================================
+Data saved to: /Users/ansa/Documents/CoposLab/Regen_ABM/mig0visco0_2
+============================================================

@@ -17,7 +17,6 @@ BOUNDARY_FILE = os.path.join(INPUT_DIR, 'sim_data', 'epi0.csv')
 CTRL_AVG_FILE = os.path.join(INPUT_DIR, 'exp_curves', 'averages','control_avg_xy.csv')
 C59_AVG_FILE = os.path.join(INPUT_DIR, 'exp_curves', 'averages','c59_avg_xy.csv')
 
-
 # Time parameters
 DT = 5e-6
 TMAX = 7.0
@@ -25,7 +24,9 @@ STEPS_TOTAL = int(TMAX/DT) + 1
 
 # Add Bone/Softening
 BONE_VISUALIZATION = True
-ALLOW_SOFTENING = True
+ALLOW_SOFTENING = False
+SOFTENING_SWAP_TIME = None # time that softening is switched off
+SOFTENING_SWAP_INTERVAL = 0.2 # how long the swap takes
 SPORATIC_SOFTENING = False
 
 # Physical parameters
@@ -48,7 +49,9 @@ K_BC_ADH = 0.01
 K_CC_REP = 30.0 # Cell-cell Repulsion Force Constant (mesenchyme)
 K_CC_ADH = 0.005 * K_CC_REP # Cell-Cell Adhesion Force Constant (mesenchyme)
 
+EPI_TYPE = "viscoelastic" # "linear", "viscoelastic" ### currently 'linear' doesnt do anything.
 KAPPA0, KAPPA1, KAPPA2 = 150.0, 75.0, 1.0 # Epithelial stiffness 
+LAM_VISCO = 0.1
 K_LATERAL = 0.008
 
 # Cell Cycle parameters
@@ -64,11 +67,11 @@ G_LENGTH_MAX = 36/24
 G_LENGTH_MIN = 18/24
 
 # Case parameters
-MIGRATION_ENABLED = False
+MIGRATION_ENABLED = True
 REGULATION_FRONT_FLAG = True
 MIGRATION_DELAY = 2.0
 WHICH_MIGRATION = 'random' # 'random' or 'anterior_posterior'
-MIGRATION_FRACTION = 0.0 # Fraction of cells that migrate (0-1)
+MIGRATION_FRACTION = 0.30 # Fraction of cells that migrate (0-1)
 MIGRATION_DIRECTION = 'x' # 'x', 'y', 'center' direction for migration (default is x)
 MU_MIGRATION = 0.5
 SIGMA_MIGRATION = 0.005
