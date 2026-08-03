@@ -193,6 +193,9 @@ def update_L0(blp0, lp):
     """Update rest length of epithelium springs (viscoelastic)"""
     
     blp0_new = blp0 + ((1/LAM_VISCO) * (lp-blp0))*DT
+    ###
+    blp0_new[-1] = blp0[-1]
+    ###
     blm0_new = np.roll(blp0_new, 1)
     return blp0_new, blm0_new
 
@@ -951,7 +954,9 @@ def run_simulation():
     times = []
     cell_count = []
     step_times = []
-    ### rest lengths time series
+    ###
+    rest_lengths = []
+    ###
     morphometrics_data = {
         'area_growth_region': [],
         'perimeter': [],
@@ -974,6 +979,9 @@ def run_simulation():
     forces.append(np.zeros_like(pos))
     velocities.append(np.zeros_like(pos))
     boundaries.append(Xe.copy())
+    ###
+    rest_lengths.append(blp0.copy())
+    ###
     Gphase.append(cycle_phases[cycle_phases == 0].shape[0])
     Mphase.append(cycle_phases[cycle_phases == 1].shape[0])
     divisions.append(division_status.copy())
@@ -1052,6 +1060,9 @@ def run_simulation():
             forces.append(F.copy())
             velocities.append(v.copy())
             boundaries.append(Xe.copy())
+            ###
+            rest_lengths.append(blp0.copy())
+            ###
             Gphase.append(cycle_phases[cycle_phases == 0].shape[0])
             Mphase.append(cycle_phases[cycle_phases == 1].shape[0])
             divisions.append(division_status.copy())
@@ -1111,6 +1122,9 @@ def run_simulation():
         'forces': np.array(forces),
         'velocities': np.array(velocities),
         'boundaries': np.array(boundaries),
+        ###
+        'rest_lengths': np.array(rest_lengths),
+        ###
         'divisions': np.array(divisions),
         'deaths': np.array(deaths),
         'times': np.array(times),

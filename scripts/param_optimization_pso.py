@@ -19,11 +19,20 @@ SIM_BOUNDS = {
     'MIGRATION_FRACTION': (0.0, 1.0),
     'KDIV': (0.0, 0.7),
     'KDEATH': (0.0, 0.5),
-    'KB_MID': (0.0, 100.0),
-    'KB_MIN': (0.0, 100.0),
+    'KAPPA1': (0.0, 100.0),
+    'KAPPA2': (0.0, 100.0),
     'MU_MIGRATION':(0.25, 0.75),
-    'LAM_VISCO': (0.01, 10.0)
+    'LAM_VISCO': (0.02, 2.0)
 }
+
+###
+LOG_SCALED = {'LAM_VISCO'}
+
+# perturbation params
+STAGNATION_TOL = 0.05
+STAGNATION_PATIENCE = 6
+PERTURB_FRACTION = 0.4
+###
 
 # Check for bounds override file (used by warm_start_pso.py for multiprocessing compatibility)
 _bounds_override_file = '.pso_bounds_override.json'
@@ -41,7 +50,13 @@ def scale_to_sim(params_scaled, param_names):
     params_sim = {}
     for i, name in enumerate(param_names):
         lower, upper = SIM_BOUNDS[name]
-        params_sim[name] = lower + params_scaled[i] * (upper - lower)
+        ###
+        if name in LOG_SCALED:
+            lo, hi = np.log10(lower), np.log10(upper)
+            params_sim[name] = 10.0 ** (lo + params_scaled[i] * (hi - lo))
+        else:
+            params_sim[name] = lower + params_scaled[i] * (upper - lower)
+        ###
     return params_sim
 
 def scale_from_sim(params_sim, param_names):
@@ -49,7 +64,13 @@ def scale_from_sim(params_sim, param_names):
     params_scaled = np.zeros(len(param_names))
     for i, name in enumerate(param_names):
         lower, upper = SIM_BOUNDS[name]
-        params_scaled[i] = (params_sim[name] - lower) / (upper - lower)
+        ###
+        if name in LOG_SCALED:
+            lo, hi = np.log10(lower), np.log10(upper)
+            params_scaled[i] = (np.log10(params_sim[name]) - lo) / (hi - lo)
+        else:
+            params_scaled[i] = (params_sim[name] - lower) / (upper - lower)
+        ###
     return params_scaled
 
 def objective_function_single(params_scaled, param_names, error_metric, exp_curve, 
@@ -65,9 +86,32 @@ def objective_function_single(params_scaled, param_names, error_metric, exp_curv
     os.makedirs(run_dir, exist_ok=True)
     
     try:
+        is_best_particle = (particle_idx == _global_best_particle_idx)
+        save_this_iteration = (iteration_count == 0) or ((iteration_count % 10 == 0) and is_best_particle)
+
+        config.VIDEO_FLAG = save_this_iteration
+        config.SAVE_DATA_DICT = save_this_iteration
+        config.SAVE_FIGURES = save_this_iteration
+        config.PROFILING_FLAG = save_this_iteration
+        config.PRINT_STEPS_FLAG = False
+        config.OUTPUT_DIR = run_dir
+        config.INTERCALATION_ENABLED = False
+        config.JAMMING_ENABLED = False
+        config.GRADIENT = None
+        config.ORIENTED_DIVISION_ANGLE = None
+        config.TMAX = 7.0
+        config.KAPPA0, config.KAPPA1, config.KAPPA2 = 150.0, 75.0, 1.0
+        config.EXT_STRESS_FORCE = False
+        config.SPORATIC_SOFTENING = False
+        ###
+        config.EPI_TYPE = "viscoelastic"
+        config.ALLOW_SOFTENING = False
+        config.SOFTENING_SWAP_TIME = None
+        ###
+
         for name, value in param_dict_sim.items():
             setattr(config, name, value)
-        
+
         if 'KDIV' in param_dict_sim:
             kdiv_val = param_dict_sim['KDIV']
             if kdiv_val > 0:
@@ -83,24 +127,6 @@ def objective_function_single(params_scaled, param_names, error_metric, exp_curv
         config.MIGRATION_ENABLED = 'MIGRATION_FRACTION' in param_dict_sim
         if 'KDIV' in param_dict_sim:
             config.KDIV = param_dict_sim['KDIV']
-        
-        is_best_particle = (particle_idx == _global_best_particle_idx)
-        save_this_iteration = (iteration_count == 0) or ((iteration_count % 10 == 0) and is_best_particle)
-        
-        config.VIDEO_FLAG = save_this_iteration
-        config.SAVE_DATA_DICT = save_this_iteration
-        config.SAVE_FIGURES = save_this_iteration
-        config.PROFILING_FLAG = save_this_iteration
-        config.PRINT_STEPS_FLAG = False
-        config.OUTPUT_DIR = run_dir
-        config.INTERCALATION_ENABLED = False
-        config.JAMMING_ENABLED = False
-        config.GRADIENT = None
-        config.DIRECTED_DIVISION_ANGLE = None
-        config.TMAX = 7.0
-        config.KB_MAX, config.KB_MID, config.KB_MIN = 150.0, 75.0, 1.0
-        config.EXT_STRESS_FORCE = False
-        config.SPORATIC_SOFTENING = False
 
         importlib.reload(abm)
         abm.OUTPUT_DIR = run_dir
@@ -192,13 +218,87 @@ _global_swarm_name = None
 _global_iteration_count = 0
 _global_best_particle_idx = 0
 _global_n_processes = 1
+###
+_global_optimizer = None
+_global_pos_history = []
+_global_vel_history = []
+_global_perturb_log = []
+_global_stall_count = 0
+_global_best_cost = np.inf
+_global_start_time = None
+_global_n_iterations = 0
+
+def perturb_swarm(positions):
+    """Resample the worst PERTURB_FRACTION of the swarm over the full bounds."""
+    swarm = _global_optimizer.swarm
+    n, d = positions.shape
+    n_kick = max(1, int(round(PERTURB_FRACTION * n)))
+    kicked = np.argsort(swarm.current_cost)[-n_kick:]
+
+    lower, upper = _global_optimizer.bounds
+    positions[kicked] = lower + np.random.rand(n_kick, d) * (upper - lower)
+
+    dirs = np.random.randn(n_kick, d)
+    dirs /= np.linalg.norm(dirs, axis=1, keepdims=True)
+    swarm.velocity[kicked] = dirs * np.abs(np.random.normal(0.2, 0.1, n_kick))[:, None]
+
+    swarm.pbest_cost[kicked] = np.inf
+    swarm.pbest_pos[kicked] = positions[kicked]
+    return kicked.tolist()
+###
 
 def objective_wrapper_global(positions):
-    """Wrapper for PySwarms objective function."""
-    return objective_function_swarm(
+    """Wrapper for PySwarms objective function. Called once per iteration."""
+    ###
+    global _global_iteration_count, _global_best_particle_idx
+    global _global_stall_count, _global_best_cost
+
+    if _global_stall_count >= STAGNATION_PATIENCE:
+        kicked = perturb_swarm(positions)
+        _global_perturb_log.append({'iteration': _global_iteration_count,
+                                    'particles': kicked})
+        _global_stall_count = 0
+        print(f"  stagnated: resampled {len(kicked)} particles")
+    ###
+
+    errors = objective_function_swarm(
         positions, _global_param_names, _global_error_metric, _global_exp_data,
         _global_parent_dir, _global_swarm_name, _global_iteration_count, _global_n_processes
     )
+
+    ###
+    _global_best_particle_idx = int(np.argmin(errors))
+    iter_best = float(errors[_global_best_particle_idx])
+    if iter_best < _global_best_cost - STAGNATION_TOL:
+        _global_stall_count = 0
+    else:
+        _global_stall_count += 1
+    _global_best_cost = min(_global_best_cost, iter_best)
+
+    _global_cost_history.append(_global_best_cost)
+    _global_pos_history.append(positions.copy())
+    _global_vel_history.append(_global_optimizer.swarm.velocity.copy())
+
+    i = _global_iteration_count
+    print(f"Iter {i+1}/{_global_n_iterations}: Iter best={iter_best:.3f}, Overall={_global_best_cost:.3f}")
+
+    if i == 0 or (i + 1) % 10 == 0:
+        elapsed = time.time() - _global_start_time
+        try:
+            send_email_notification(
+                f"PSO: {_global_swarm_name} - Iter {i+1}/{_global_n_iterations}",
+                f"""Swarm: {_global_swarm_name}
+Iteration: {i+1}/{_global_n_iterations} ({(i+1)/_global_n_iterations*100:.1f}%)
+Best Error: {_global_best_cost:.3f}
+Perturbations so far: {len(_global_perturb_log)}
+Time: {elapsed/3600:.2f}h elapsed, {(elapsed/(i+1))*(_global_n_iterations-i-1)/3600:.2f}h remaining
+""")
+        except:
+            pass
+
+    _global_iteration_count += 1
+    ###
+    return errors
 
 def save_history(history, run_dir):
     """Save optimization history."""
@@ -316,7 +416,12 @@ def run_pso_optimization(
     global _global_cost_history, _global_param_names, _global_error_metric
     global _global_exp_data, _global_parent_dir, _global_swarm_name
     global _global_iteration_count, _global_best_particle_idx, _global_n_processes
-    
+    ###
+    global _global_optimizer, _global_pos_history, _global_vel_history
+    global _global_perturb_log, _global_stall_count, _global_best_cost
+    global _global_start_time, _global_n_iterations
+    ###
+
     _global_cost_history = []
     _global_param_names = param_names
     _global_error_metric = error_metric
@@ -324,40 +429,25 @@ def run_pso_optimization(
     _global_parent_dir = run_dir
     _global_swarm_name = swarm_name
     _global_n_processes = n_processes
-    
-    pos_history = []
-    vel_history = []
-    
-    start_time = time.time()
-    
-    for i in range(n_iterations):
-        _global_iteration_count = i
-        optimizer.optimize(objective_wrapper_global, iters=1, verbose=False)
-        
-        _global_cost_history.append(optimizer.swarm.best_cost)
-        _global_best_particle_idx = np.argmin(optimizer.swarm.current_cost)
-        
-        pos_history.append(optimizer.swarm.position.copy())
-        vel_history.append(optimizer.swarm.velocity.copy())
-        
-        print(f"Iter {i+1}/{n_iterations}: Best={optimizer.swarm.best_cost:.3f}")
-        
-        if i == 0 or (i + 1) % 10 == 0:
-            elapsed = time.time() - start_time
-            subject = f"PSO: {swarm_name} - Iter {i+1}/{n_iterations}"
-            body = f"""Swarm: {swarm_name}
-Iteration: {i+1}/{n_iterations} ({(i+1)/n_iterations*100:.1f}%)
-Best Error: {optimizer.swarm.best_cost:.3f}
-Time: {elapsed/3600:.2f}h elapsed, {(elapsed/(i+1))*(n_iterations-i-1)/3600:.2f}h remaining
-"""
-            try:
-                send_email_notification(subject, body)
-            except:
-                pass
-    
-    elapsed_time = time.time() - start_time
-    best_cost = optimizer.swarm.best_cost
-    best_pos_scaled = optimizer.swarm.best_pos
+    ###
+    _global_optimizer = optimizer
+    _global_pos_history = []
+    _global_vel_history = []
+    _global_perturb_log = []
+    _global_stall_count = 0
+    _global_best_cost = np.inf
+    _global_iteration_count = 0
+    _global_best_particle_idx = 0
+    _global_n_iterations = n_iterations
+    _global_start_time = time.time()
+
+    best_cost, best_pos_scaled = optimizer.optimize(
+        objective_wrapper_global, iters=n_iterations, verbose=False)
+
+    elapsed_time = time.time() - _global_start_time
+    pos_history = _global_pos_history
+    vel_history = _global_vel_history
+    ###
     best_params_sim = scale_to_sim(best_pos_scaled, param_names)
     
     results = {
@@ -374,6 +464,12 @@ Time: {elapsed/3600:.2f}h elapsed, {(elapsed/(i+1))*(n_iterations-i-1)/3600:.2f}
         'elapsed_time': elapsed_time,
         'pso_options': pso_options,
         'topology': topology,
+        ###
+        'perturbations': _global_perturb_log,
+        'stagnation_settings': {'tol': STAGNATION_TOL,
+                                'patience': STAGNATION_PATIENCE,
+                                'fraction': PERTURB_FRACTION},
+        ###
     }
     
     with open(os.path.join(run_dir, 'pso_results.pkl'), 'wb') as f:
@@ -394,7 +490,7 @@ def define_swarms(which=1):
             'CTRL': [
                 {
                     'name': 'visco_ctrl',
-                    'center': {'MIGRATION_FRACTION': 0.5, 'KDIV': 0.35, 'LAM_VISCO': 5.0},
+                    'center': {'MIGRATION_FRACTION': 0.5, 'KDIV': 0.35, 'LAM_VISCO': 0.3},
                     'options': {
                         "c1": 1.6,
                         "c2": 0.8,
@@ -407,7 +503,7 @@ def define_swarms(which=1):
             'C59': [
                 {
                     'name': 'visco_c59',
-                    'center': {'MIGRATION_FRACTION': 0.5, 'KDIV': 0.35, 'LAM_VISCO': 5.0},
+                    'center': {'MIGRATION_FRACTION': 0.5, 'KDIV': 0.35, 'LAM_VISCO': 0.3},
                     'options': {
                         "c1": 1.6,
                         "c2": 0.8,
@@ -419,20 +515,20 @@ def define_swarms(which=1):
             ],
         }
         
-    if which == 1:
-        param_names = ['MIGRATION_FRACTION', 'KDIV', 'KB_MID', 'KB_MIN']
+    elif which == 1:
+        param_names = ['MIGRATION_FRACTION', 'KDIV', 'KAPPA1', 'KAPPA2']
         
         swarms = {
             'CTRL': [
                 {
                     'name': 'CTRL_valley',
-                    'center': {'MIGRATION_FRACTION': 0.3, 'KDIV': 0.4, 'KB_MID': 75, 'KB_MIN': 1},
+                    'center': {'MIGRATION_FRACTION': 0.3, 'KDIV': 0.4, 'KAPPA1': 75, 'KAPPA2': 1},
                     'options': {'c1': 1.5, 'c2': 0.7, 'w': 0.5, 'k': 2, 'p': 2},
                     'topology': 'lbest',
                 },
                 {
                     'name': 'CTRL_low_stiff',
-                    'center': {'MIGRATION_FRACTION': 0.3, 'KDIV': 0.2, 'KB_MID': 20, 'KB_MIN': 20},
+                    'center': {'MIGRATION_FRACTION': 0.3, 'KDIV': 0.2, 'KAPPA1': 20, 'KAPPA2': 20},
                     'options': {'c1': 1.0, 'c2': 0.6, 'w': 0.5, 'k': 2, 'p': 2},
                     'topology': 'lbest',
                     'bounds_custom': (
@@ -442,7 +538,7 @@ def define_swarms(which=1):
                 },
                 {
                     'name': 'CTRL_high_stiff',
-                    'center': {'MIGRATION_FRACTION': 0.8, 'KDIV': 0.4, 'KB_MID': 90, 'KB_MIN': 90},
+                    'center': {'MIGRATION_FRACTION': 0.8, 'KDIV': 0.4, 'KAPPA1': 90, 'KAPPA2': 90},
                     'options': {'c1': 1.2, 'c2': 1.0, 'w': 0.4, 'k': 3, 'p': 2},
                     'topology': 'lbest',
                 },
@@ -450,19 +546,19 @@ def define_swarms(which=1):
             'C59': [
                 {
                     'name': 'C59_valley',
-                    'center': {'MIGRATION_FRACTION': 0.1, 'KDIV': 0.125, 'KB_MID': 75, 'KB_MIN': 1},
+                    'center': {'MIGRATION_FRACTION': 0.1, 'KDIV': 0.125, 'KAPPA1': 75, 'KAPPA2': 1},
                     'options': {'c1': 1.5, 'c2': 0.7, 'w': 0.5, 'k': 2, 'p': 2},
                     'topology': 'lbest',
                 },
                 {
                     'name': 'C59_uniform_stiff',
-                    'center': {'MIGRATION_FRACTION': 0.2, 'KDIV': 0.35, 'KB_MID': 75, 'KB_MIN': 75},
+                    'center': {'MIGRATION_FRACTION': 0.2, 'KDIV': 0.35, 'KAPPA1': 75, 'KAPPA2': 75},
                     'options': {'c1': 1.2, 'c2': 1.0, 'w': 0.4, 'k': 3, 'p': 2},
                     'topology': 'lbest',
                 },
                 {
                     'name': 'C59_tip_stiff',
-                    'center': {'MIGRATION_FRACTION': 0.1, 'KDIV': 0.2, 'KB_MID': 20, 'KB_MIN': 60},
+                    'center': {'MIGRATION_FRACTION': 0.1, 'KDIV': 0.2, 'KAPPA1': 20, 'KAPPA2': 60},
                     'options': {'c1': 1.3, 'c2': 0.8, 'w': 0.45, 'k': 2, 'p': 2},
                     'topology': 'lbest',
                 },
@@ -510,7 +606,7 @@ if __name__ == '__main__':
         'l2_c59': C59_AVG_FILE
     }
     
-    swarms, param_names = define_swarms(which=2)
+    swarms, param_names = define_swarms(which=0)
     
     parent_output_dir = f"pso_multiswarm_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     os.makedirs(parent_output_dir, exist_ok=True)

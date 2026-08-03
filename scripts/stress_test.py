@@ -1,4 +1,9 @@
-"""Stress test (poking) simulations for limb regeneration. """
+"""Stress test (poking) simulations for limb regeneration. 
+
+to-do: 
+- now that we have viscoelasticity, i need to make sure the rest lengths are properly updated when pulling the snapshots
+- viscoelasticity should probably then be turned off, as AFM experiments don't take 2 days (should think about the AFM timescale)
+"""
 import _setup_path
 import numpy as np
 import pandas as pd
@@ -16,23 +21,32 @@ data_dir = 'Cases2026-01-02/SOFT/MIGRATION30'
 
 out_dir = f'StressTesting/{date_str}'
 
-def get_data(t=1, soft=True):
-    """Load boundary and cell data at specified time."""
+def get_data(t=1, soft=True, data_dir_local=None):
+    """Load boundary, cell and rest length data at specified time."""
+    if data_dir_local is None:
+        data_dir_local = data_dir
+    ###
+    blp0 = None
+    ###
     try:
-        with open(f'{data_dir}/data_dict.pkl', 'rb') as f:
+        with open(f'{data_dir_local}/data_dict.pkl', 'rb') as f:
             data_dict = pickle.load(f)
         times = data_dict['times']
         idx_t = np.argmin(np.abs(times - t))  # Find closest time in case of floating point errors
         Xe = data_dict['boundaries'][idx_t]
         pos = data_dict['positions'][idx_t]
+        ###
+        if 'rest_lengths' in data_dict and len(data_dict['rest_lengths']) > idx_t:
+            blp0 = data_dict['rest_lengths'][idx_t]
+        ###
     except FileNotFoundError:
         print('data_dict.pkl not found, looking for boundary_time_series.csv...')
-        Xe_df = pd.read_csv(os.path.join(data_dir, 'boundary_time_series.csv'))
+        Xe_df = pd.read_csv(os.path.join(data_dir_local, 'boundary_time_series.csv'))
         Xe = Xe_df.loc[np.abs(Xe_df['time'] - t) < 1e-10][['x', 'y']].values
-        pos_df = pd.read_csv(os.path.join(data_dir, 'cells.csv'))
+        pos_df = pd.read_csv(os.path.join(data_dir_local, 'cells.csv'))
         pos = pos_df.loc[np.abs(pos_df['time'] - t) < 1e-10][['x', 'y']].values
 
-    return Xe, pos, len(pos)
+    return Xe, pos, len(pos), blp0
 
 def run_stress_test(t0, force_app_time=2.0, soft=True, data_dir_local=None, out_dir_local=None):
     """Run stress test for a single time point."""
@@ -58,15 +72,25 @@ def run_stress_test(t0, force_app_time=2.0, soft=True, data_dir_local=None, out_
     config.KDEATH = 0.0
     config.REGULATION_FRONT_FLAG = False
     config.GRADIENT = None
+    ###
+    config.EPI_TYPE = 'linear'
+    ###
     os.makedirs(config.OUTPUT_DIR, exist_ok=True)
     
     import abm
     importlib.reload(abm)
 
-    Xe, pos, N0 = get_data(t0, soft=soft)
-    
+    Xe, pos, N0, blp0_snap = get_data(t0, soft=soft, data_dir_local=data_dir_local)
+
     _, _, _, Db_loaded, blp0, blm0, dsb, kb_vals, _ = abm.build_boundaries(soft=config.ALLOW_SOFTENING)
-    
+    ###
+    if blp0_snap is not None:
+        blp0 = blp0_snap.copy()
+        blm0 = np.roll(blp0, 1)
+    else:
+        print(f"[t={t0}] WARNING: no rest_lengths in snapshot, epithelium will be treated as pre-stressed")
+    ###
+
     force_points = config.POKING_POINTS
     K_EXT_tuned = tune_F_per_segment(Xe, Db_loaded, config.FORCE_PER_UNIT_LENGTH, points=force_points)
     print(f"[t={t0}] K_EXT tuned to: {K_EXT_tuned:.6f}")

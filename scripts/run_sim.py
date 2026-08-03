@@ -5,7 +5,7 @@ from utils.profiler import profiling
 
 # Example parameters. All other parameters default to those in src/config.py
 config.MIGRATION_ENABLED = True
-config.SOFTENING_ENABLED = True
+config.ALLOW_SOFTENING = True
 config.SOFTENING_SWAP_TIME = 2.0
 config.MIGRATION_FRACTION = 0.5
 

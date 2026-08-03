@@ -22,7 +22,7 @@ def run_single_case(case_name, soft, parent_dir):
     config.INTERCALATION_ENABLED = False
     config.INTERCAL_FRACTION = 0.0
     config.GRADIENT = None
-    config.DIRECTED_DIVISION_ANGLE = None
+    config.ORIENTED_DIVISION_ANGLE = None
     config.JAMMING_ENABLED = False
     config.EXT_STRESS_FORCE = False
     config.VIDEO_FLAG = True
@@ -32,9 +32,9 @@ def run_single_case(case_name, soft, parent_dir):
     os.makedirs(config.OUTPUT_DIR, exist_ok=True)
     
     if case_name == 'ANGLE0':
-        config.DIRECTED_DIVISION_ANGLE = 0.0
+        config.ORIENTED_DIVISION_ANGLE = 0.0
     elif case_name == 'ANGLE_PI_2':
-        config.DIRECTED_DIVISION_ANGLE = np.pi/2
+        config.ORIENTED_DIVISION_ANGLE = np.pi/2
     elif case_name == 'MIGRATION6':
         config.MIGRATION_ENABLED = True
         config.MIGRATION_FRACTION = 0.06
